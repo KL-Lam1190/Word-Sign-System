@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="utf-8">
+    <title>Word-Like Document Editor (Local Version)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; padding: 0; background-color: #f3f2f1; 
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+
+        .top-navbar {
+            background-color: #2b579a; color: white; padding: 5px 20px;
+            display: flex; justify-content: space-between; align-items: center; z-index: 100;
+        }
+        .top-navbar h1 { margin: 0; font-size: 16px; font-weight: 500; }
+        .sidebar-toggle-btn { background: transparent; border: none; color: white; font-size: 18px; cursor: pointer; margin-right: 10px; }
+        .sidebar-toggle-btn:hover { color: #e1dfdd; }
+
+        .top-icon-btn { background: transparent; border: none; color: white; font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: 0.2s; }
+        .top-icon-btn:hover { background: rgba(255,255,255,0.2); }
+        
+        .floating-top-btn {
+            display: none; position: fixed; top: 0; left: 20px;
+            background: #2b579a; color: white; padding: 8px 20px; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+            font-size: 14px; font-weight: bold; cursor: pointer; z-index: 3000; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis; transition: background 0.2s;
+        }
+        .floating-top-btn:hover { background: #1e3e6d; }
+        .floating-top-btn::after { content: '\f0b2'; font-family: "Font Awesome 5 Free"; font-weight: 900; margin-left: 10px; font-size: 12px; opacity: 0.8; }
+        
+        .ribbon-container { background: #f3f2f1; border-bottom: 1px solid #e1dfdd; z-index: 90; }
+        .ribbon-tabs { display: flex; background: #ffffff; border-bottom: 1px solid #e1dfdd; padding-left: 10px; }
+        .ribbon-tab { padding: 8px 16px; cursor: pointer; color: #323130; font-size: 13px; font-weight: normal; border-bottom: 2px solid transparent; white-space: nowrap; }
+        .ribbon-tab:hover { background: #f3f2f1; }
+        .ribbon-tab.active { color: #2b579a; border-bottom: 2px solid #2b579a; font-weight: 600; }
+        .ribbon-content { display: none; align-items: center; gap: 10px; padding: 8px 15px; background: #f3f2f1; }
+        .ribbon-content.active { display: flex; }
+
+        .toolbar-group { display: flex; gap: 4px; border-right: 1px solid #c8c6c4; padding-right: 10px; align-items: center; height: 100%; flex-shrink: 0; }
+        .toolbar-group:last-child { border-right: none; }
+        .toolbar-label { font-size: 11px; color: #605e5c; text-align: center; width: 100%; display: block; margin-top: 4px; }
+        .toolbar-col { display: flex; flex-direction: column; align-items: center; }
+
+        .tool-btn { background: transparent; border: 1px solid transparent; padding: 5px 8px; cursor: pointer; border-radius: 4px; color: #323130; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .tool-btn:hover { background: #e1dfdd; }
+        .tool-btn.active { background-color: #c8c6c4; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
+        .tool-btn.large { font-size: 24px; padding: 8px 12px; }
+        .tool-btn.large span { font-size: 11px; margin-top: 4px; }
+        .tool-select { padding: 4px; border: 1px solid #8a8886; border-radius: 2px; background: white; color: #323130; font-family: inherit; font-size: 13px; outline: none; }
+        
+        .custom-dropdown-container { position: relative; display: inline-flex; align-items: center; border: 1px solid #8a8886; border-radius: 2px; background: white; height: 24px; z-index: 100; }
+        .custom-dropdown-input { width: 35px; border: none; outline: none; text-align: center; font-size: 13px; height: 100%; background: transparent; }
+        .custom-dropdown-toggle { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 100%; cursor: pointer; background: #f3f2f1; border-left: 1px solid #8a8886; }
+        .custom-dropdown-toggle:hover { background: #e1dfdd; }
+        .custom-dropdown-list { display: none; position: absolute; top: 25px; left: -1px; width: 60px; background: white; border: 1px solid #8a8886; box-shadow: 0 2px 4px rgba(0,0,0,0.2); max-height: 200px; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
+        .custom-dropdown-list li { padding: 4px 10px; cursor: pointer; font-size: 13px; text-align: center; color: #323130; }
+        .custom-dropdown-list li:hover { background: #0078d4; color: white; }
+
+        .color-palette-dropdown { display: none; position: absolute; top: 30px; left: 0; background: white; border: 1px solid #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.2); padding: 8px; z-index: 200; width: 140px; }
+        .color-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 8px; }
+        .color-swatch { width: 20px; height: 20px; border: 1px solid #ddd; cursor: pointer; border-radius: 2px; }
+        .color-swatch:hover { border-color: #000; transform: scale(1.1); }
+        .custom-color-btn { width: 100%; padding: 4px; font-size: 11px; cursor: pointer; background: #f3f2f1; border: 1px solid #ccc; text-align: center; margin-top: 5px; }
+
+        .workspace { display: flex; flex: 1; overflow: hidden; position: relative; }
+        .sidebar { width: 300px; background: #ffffff; border-right: 1px solid #e1dfdd; display: flex; flex-direction: column; box-shadow: 2px 0 5px rgba(0,0,0,0.05); z-index: 10; transition: transform 0.3s ease; }
+        .sidebar-header { padding: 15px; background: #f8f8f8; border-bottom: 1px solid #e1dfdd; font-weight: bold; }
+        .sidebar-content { padding: 15px; flex: 1; overflow-y: auto; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #323130; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #8a8886; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 13px; }
+        
+        .preview-area { flex: 1; overflow: auto; padding: 40px 20px; display: flex; justify-content: center; align-items: flex-start; background: #525659; }
+        
+        .page-preview-wrapper { transition: transform 0.2s ease; transform-origin: top center; }
+        .page-preview { width: 210mm; min-height: 297mm; background: #ffffff; padding: 25mm; box-shadow: 0 2px 10px rgba(0,0,0,0.3); box-sizing: border-box; color: #000; border-radius: 2px; line-height: 1.6; font-size: 16px; display: flex; flex-direction: column; position: relative; transition: width 0.3s, min-height 0.3s, padding 0.3s; }
+        .gridlines-active { background-image: linear-gradient(to right, #f0f0f0 1px, transparent 1px), linear-gradient(to bottom, #f0f0f0 1px, transparent 1px) !important; background-size: 20px 20px !important; }
+
+        /* --- DEMO WATERMARK CSS --- */
+        .demo-watermark {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* Allows clicking through the watermark */
+            z-index: 9999;
+            overflow: hidden;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='350' height='350'><text x='50%' y='50%' font-size='28' fill='rgba(180,180,180,0.25)' font-weight='bold' font-family='sans-serif' text-anchor='middle' alignment-baseline='middle' transform='rotate(-35 175 175)'>This just a Demo</text></svg>");
+        }
+        
+        .demo-badge {
+            position: fixed;
+            bottom: 20px; right: 20px;
+            background: rgba(209, 52, 56, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 10000;
+            pointer-events: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            letter-spacing: 1px;
+        }
+
+        #editorContent { flex: 1; outline: none; min-height: 100%; position: relative; z-index: 10; }
+        #editorContent h1, #editorContent h2 { margin-top: 0; }
+        
+        #editorContent table { border-collapse: collapse; width: 100%; margin-bottom: 15px; }
+        #editorContent table, #editorContent th, #editorContent td { border: 1px solid #000; }
+        #editorContent th, #editorContent td { padding: 8px; text-align: left; }
+
+        #tableContextMenu { display: none; position: absolute; background: #fff; border: 1px solid #2b579a; box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 4px; z-index: 1000; gap: 4px; border-radius: 4px; align-items: center; }
+        .table-ctx-btn { background: transparent; border: none; padding: 4px 8px; font-size: 12px; cursor: pointer; border-radius: 2px; }
+        .table-ctx-btn:hover { background: #e1dfdd; }
+        .table-ctx-divider { width: 1px; height: 16px; background: #ccc; }
+
+        .actions-panel { padding: 15px; border-top: 1px solid #e1dfdd; background: #f8f8f8; display:flex; flex-direction:column; gap:8px; }
+        .btn { border: none; padding: 10px; font-size: 14px; cursor: pointer; border-radius: 4px; font-weight: 600; transition: 0.2s; }
+        .btn-success { background-color: #107c10; color: white; }
+        .btn-primary { background-color: #2b579a; color: white; }
+        .btn-docx { background-color: #0078d4; color: white; }
+        .btn-secondary { background: #ffffff; color: #323130; border: 1px solid #8a8886; }
+        .btn:hover { filter: brightness(0.9); }
+
+        .free-move-block { display: inline-block; position: relative; border: 1px solid transparent; padding: 10px; margin: 5px; z-index: 20; background: transparent; outline: none; vertical-align: top; }
+        .free-move-block:hover, .free-move-block:focus-within, .free-move-block:focus { border: 1px dashed #0078d4; background: rgba(255,255,255,0.8); }
+        
+        .drag-handle { position: absolute; top: -12px; left: -12px; width: 24px; height: 24px; background: #2b579a; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: move; z-index: 25; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .free-move-block:hover .drag-handle, .free-move-block:focus-within .drag-handle, .free-move-block:focus .drag-handle { display: flex; }
+        
+        .resize-handle { position: absolute; bottom: -8px; right: -8px; width: 16px; height: 16px; background: #2b579a; border-radius: 50%; cursor: nwse-resize; display: none; z-index: 25; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .free-move-block:hover .resize-handle, .free-move-block:focus-within .resize-handle, .free-move-block:focus .resize-handle { display: block; }
+
+        .block-float-btn { position: absolute; top: -12px; left: 18px; width: 24px; height: 24px; background: #ffb900; color: #000; border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; z-index: 25; font-size: 12px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .free-move-block:hover .block-float-btn, .free-move-block:focus-within .block-float-btn, .free-move-block:focus .block-float-btn { display: flex; }
+
+        .block-fit-btn { position: absolute; top: -12px; left: 48px; width: 24px; height: 24px; background: #0078d4; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; z-index: 25; font-size: 12px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .free-move-block:hover .block-fit-btn, .free-move-block:focus-within .block-fit-btn, .free-move-block:focus .block-fit-btn { display: flex; }
+
+        .block-delete-btn { position: absolute; top: -12px; right: -12px; background: #d13438; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 12px; z-index:25; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .free-move-block:hover .block-delete-btn, .free-move-block:focus-within .block-delete-btn, .free-move-block:focus .block-delete-btn { display: flex; }
+
+        .transparent-input { background: transparent; border: 1px solid transparent; outline: none; }
+        .transparent-input:focus { border: 1px dashed #ccc; background: rgba(255,255,255,0.5); }
+
+        .page-break-indicator { display: block; width: calc(100% + 50mm); margin-left: -25mm; height: 30px; background: #525659; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; text-align: center; page-break-after: always; break-after: page; position: relative; margin-top: 40px; margin-bottom: 40px; user-select: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1), inset 0 -2px 4px rgba(0,0,0,0.1); }
+
+        #sigModal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 4px; width: 90%; max-width: 500px; text-align: center; }
+        canvas { border: 2px dashed #bbb; background: #fff; cursor: crosshair; touch-action: none; width: 100%; height: 200px; border-radius: 4px; }
+        .modal-buttons { margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        
+        .list-item { margin-bottom:8px; padding:8px; background:#fff; border:1px solid #e1dfdd; border-radius:4px; font-size: 12px; }
+        .list-item strong { display: block; margin-bottom: 4px; color: #2b579a; font-size: 13px; }
+        .list-item-actions { margin-top: 5px; display: flex; gap: 5px; }
+        .list-item-actions button { font-size: 10px; cursor: pointer; background: none; border: 1px solid #ccc; padding: 2px 5px; border-radius: 3px; }
+        .list-item-actions button:hover { background: #e1dfdd; }
+        .delete-btn { color: #d13438; }
+
+        @media (max-width: 768px) {
+            .ribbon-tabs { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+            .ribbon-content { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 15px; }
+            .sidebar { position: absolute; height: 100%; z-index: 1000; left: -300px; }
+            .sidebar.active-mobile { left: 0; }
+            .preview-area { padding: 10px; }
+            .top-navbar .fa-file-word { display: none; }
+            .top-navbar h1 { font-size: 15px; max-width: 100%; white-space: normal; overflow: visible; word-break: break-word; line-height: 1.3; }
+            #documentNameInput { width: 120px; }
+        }
+
+        @media print {
+            body, .workspace, .preview-area { background: white; margin: 0; padding: 0; display: block; height: auto; overflow: visible; }
+            .top-navbar, .ribbon-container, .sidebar, #sigModal, #tableContextMenu, .floating-top-btn, .demo-badge { display: none !important; }
+            .page-preview-wrapper { transform: none !important; }
+            .page-preview { box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; background-image: none !important; }
+            
+            /* Ensures watermark prints in background */
+            .demo-watermark { display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            
+            .page-break-indicator { height: 0 !important; margin: 0 !important; border: none !important; background: none !important; }
+            .gridlines-active { background-image: none !important; }
+            .sig-placeholder { display: none !important; }
+            .free-move-block { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; }
+            .block-delete-btn, .drag-handle, .block-float-btn, .resize-handle, .block-fit-btn { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Floating Demo Badge -->
+    <div class="demo-badge"><i class="fas fa-exclamation-triangle"></i> This just a Demo</div>
+
+    <div id="floatingTopToggle" class="floating-top-btn" onclick="toggleTopBar()" title="Click to Exit Focus Mode"></div>
+
+    <div class="top-navbar">
+        <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0; padding-right: 15px;">
+            <button onclick="toggleSidebar()" class="sidebar-toggle-btn" title="Toggle Document Setup Menu"><i class="fas fa-bars"></i></button>
+            <i class="fas fa-file-word" style="font-size:20px;"></i>
+            <input type="text" id="documentNameInput" value="Untitled Document" 
+                style="background:transparent; border:1px solid transparent; color:white; font-size:16px; font-weight:500; outline:none; padding:2px 5px; width:200px; border-radius:3px;" 
+                onfocus="this.style.border='1px dashed rgba(255,255,255,0.7)'; this.style.background='rgba(0,0,0,0.1)';" 
+                onblur="this.style.border='1px solid transparent'; this.style.background='transparent';"
+                title="Click to rename document">
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:15px;">
+            <div style="display:flex; gap:5px;">
+                <button class="top-icon-btn" onclick="formatDoc('undo')" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+                <button class="top-icon-btn" onclick="formatDoc('redo')" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+                <button class="top-icon-btn" onclick="toggleTopBar()" title="Focus Mode (Hide Top Bar)"><i class="fas fa-expand-arrows-alt"></i></button>
+            </div>
+            
+            <div class="user-info" style="font-size: 13px;">
+                <i class="fas fa-laptop-house"></i> Local Offline Editor
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW RIBBON INTERFACE -->
+    <div class="ribbon-container" id="mainRibbon">
+        <div class="ribbon-tabs">
+            <div class="ribbon-tab active" onclick="switchTab('home')">Home (常用)</div>
+            <div class="ribbon-tab" onclick="switchTab('insert')">Insert (插入)</div>
+            <div class="ribbon-tab" onclick="switchTab('layout')">Layout (版面配置)</div>
+            <div class="ribbon-tab" onclick="switchTab('view')">View (檢視)</div>
+        </div>
+
+        <!-- 1. HOME TAB -->
+        <div class="ribbon-content active" id="tab-home">
+            <!-- CLIPBOARD -->
+            <div class="toolbar-group">
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                    <button class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('cut')" title="Cut (Ctrl+X)"><i class="fas fa-cut" style="color:#2b579a;"></i></button>
+                    <button class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('copy')" title="Copy (Ctrl+C)"><i class="fas fa-copy" style="color:#2b579a;"></i></button>
+                    <button class="tool-btn" onmousedown="event.preventDefault();" onclick="handlePaste()" title="Paste (Ctrl+V)"><i class="fas fa-paste" style="color:#2b579a;"></i></button>
+                </div>
+                <span class="toolbar-label">Clipboard</span>
+            </div>
+
+            <!-- FONT -->
+            <div class="toolbar-group">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <div style="display:flex; gap:4px;">
+                        <select class="tool-select" id="fontFamilySelect" onchange="formatDoc('fontName', this.value)" style="width:140px;" title="Font Family">
+                            <optgroup label="Theme Fonts">
+                                <option value="Aptos, sans-serif">Aptos</option>
+                                <option value="Calibri, sans-serif">Calibri</option>
+                                <option value="Cambria, serif">Cambria</option>
+                            </optgroup>
+                            <optgroup label="Chinese Fonts">
+                                <option value="'Microsoft JhengHei', sans-serif" selected>微軟正黑體 (Microsoft JhengHei)</option>
+                                <option value="'MingLiU', serif">細明體 (MingLiU)</option>
+                                <option value="'PMingLiU', serif">新細明體 (PMingLiU)</option>
+                                <option value="'Microsoft YaHei', sans-serif">微软雅黑 (Microsoft YaHei)</option>
+                            </optgroup>
+                            <optgroup label="Standard Fonts">
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="'Arial Black', sans-serif">Arial Black</option>
+                                <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+                                <option value="'Courier New', monospace">Courier New</option>
+                                <option value="Garamond, serif">Garamond</option>
+                                <option value="Georgia, serif">Georgia</option>
+                                <option value="Impact, sans-serif">Impact</option>
+                                <option value="Tahoma, sans-serif">Tahoma</option>
+                                <option value="'Times New Roman', serif">Times New Roman</option>
+                                <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                                <option value="Verdana, sans-serif">Verdana</option>
+                            </optgroup>
+                        </select>
+                        
+                        <div class="custom-dropdown-container" id="fontSizeDropdownContainer">
+                            <input type="text" id="fontSizeInput" class="custom-dropdown-input" value="16" onchange="applyCustomFontSize(this.value)" onmousedown="event.stopPropagation();">
+                            <div class="custom-dropdown-toggle" onmousedown="event.preventDefault(); toggleFontSizeDropdown();"><i class="fas fa-chevron-down" style="font-size:10px;"></i></div>
+                            <ul class="custom-dropdown-list" id="fontSizeList">
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(8)">8</li>
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(10)">10</li>
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(12)">12</li>
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(14)">14</li>
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(16)">16</li>
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(18)">18</li>
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(24)">24</li>
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(36)">36</li>
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(48)">48</li>
+                                <li onmousedown="event.preventDefault(); selectCustomFontSize(72)">72</li>
+                            </ul>
+                        </div>
+                        <button class="tool-btn" onmousedown="event.preventDefault(); stepFontSize(1);" title="Increase Font Size"><i class="fas fa-font"></i><i class="fas fa-caret-up" style="font-size:8px;"></i></button>
+                        <button class="tool-btn" onmousedown="event.preventDefault(); stepFontSize(-1);" title="Decrease Font Size"><i class="fas fa-font" style="font-size:10px;"></i><i class="fas fa-caret-down" style="font-size:8px;"></i></button>
+                        <div style="width:1px; height:15px; background:#ccc; margin:0 4px;"></div>
+                        <button class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('removeFormat')" title="Clear All Formatting"><i class="fas fa-eraser" style="color:#d13438;"></i></button>
+                    </div>
+                    
+                    <div style="display:flex; gap:2px; align-items:center;">
+                        <button id="btn-bold" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('bold')" title="Bold"><i class="fas fa-bold"></i></button>
+                        <button id="btn-italic" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('italic')" title="Italic"><i class="fas fa-italic"></i></button>
+                        <button id="btn-underline" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('underline')" title="Underline"><i class="fas fa-underline"></i></button>
+                        <button id="btn-strikeThrough" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('strikeThrough')" title="Strikethrough"><i class="fas fa-strikethrough"></i></button>
+                        <button id="btn-subscript" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('subscript')" title="Subscript"><i class="fas fa-subscript"></i></button>
+                        <button id="btn-superscript" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('superscript')" title="Superscript"><i class="fas fa-superscript"></i></button>
+                        
+                        <div style="width:1px; height:15px; background:#ccc; margin:0 4px;"></div>
+                        
+                        <div style="position:relative;">
+                            <button class="tool-btn" onmousedown="event.preventDefault();" onclick="toggleColorPalette('bg')" title="Highlight Color">
+                                <i class="fas fa-highlighter"></i><div id="bgColorIndicator" style="width:14px; height:3px; background:#ffff00; margin-top:1px;"></div>
+                            </button>
+                            <div class="color-palette-dropdown" id="bgColorPalette">
+                                <div class="color-grid">
+                                    <div class="color-swatch" style="background:transparent; border-color:red;" title="No Color" onmousedown="event.preventDefault(); applyColor('hiliteColor', 'transparent', 'bg')"></div>
+                                    <div class="color-swatch" style="background:#ffff00;" onmousedown="event.preventDefault(); applyColor('hiliteColor', '#ffff00', 'bg')"></div>
+                                    <div class="color-swatch" style="background:#00ff00;" onmousedown="event.preventDefault(); applyColor('hiliteColor', '#00ff00', 'bg')"></div>
+                                    <div class="color-swatch" style="background:#00ffff;" onmousedown="event.preventDefault(); applyColor('hiliteColor', '#00ffff', 'bg')"></div>
+                                    <div class="color-swatch" style="background:#ff00ff;" onmousedown="event.preventDefault(); applyColor('hiliteColor', '#ff00ff', 'bg')"></div>
+                                    <div class="color-swatch" style="background:#ff0000;" onmousedown="event.preventDefault(); applyColor('hiliteColor', '#ff0000', 'bg')"></div>
+                                    <div class="color-swatch" style="background:#0000ff;" onmousedown="event.preventDefault(); applyColor('hiliteColor', '#0000ff', 'bg')"></div>
+                                    <div class="color-swatch" style="background:#808080;" onmousedown="event.preventDefault(); applyColor('hiliteColor', '#808080', 'bg')"></div>
+                                    <div class="color-swatch" style="background:#c0c0c0;" onmousedown="event.preventDefault(); applyColor('hiliteColor', '#c0c0c0', 'bg')"></div>
+                                    <div class="color-swatch" style="background:#000000;" onmousedown="event.preventDefault(); applyColor('hiliteColor', '#000000', 'bg')"></div>
+                                </div>
+                                <input type="color" id="bgNativeColor" style="display:none;" onchange="applyColor('hiliteColor', this.value, 'bg')">
+                                <button class="custom-color-btn" onmousedown="event.preventDefault(); document.getElementById('bgNativeColor').click()">Custom...</button>
+                            </div>
+                        </div>
+
+                        <div style="position:relative;">
+                            <button class="tool-btn" onmousedown="event.preventDefault();" onclick="toggleColorPalette('text')" title="Font Color">
+                                <i class="fas fa-font"></i><div id="textColorIndicator" style="width:14px; height:3px; background:#000000; margin-top:1px;"></div>
+                            </button>
+                            <div class="color-palette-dropdown" id="textColorPalette">
+                                <div class="color-grid">
+                                    <div class="color-swatch" style="background:#000000;" onmousedown="event.preventDefault(); applyColor('foreColor', '#000000', 'text')"></div>
+                                    <div class="color-swatch" style="background:#444444;" onmousedown="event.preventDefault(); applyColor('foreColor', '#444444', 'text')"></div>
+                                    <div class="color-swatch" style="background:#ff0000;" onmousedown="event.preventDefault(); applyColor('foreColor', '#ff0000', 'text')"></div>
+                                    <div class="color-swatch" style="background:#00b050;" onmousedown="event.preventDefault(); applyColor('foreColor', '#00b050', 'text')"></div>
+                                    <div class="color-swatch" style="background:#0078d4;" onmousedown="event.preventDefault(); applyColor('foreColor', '#0078d4', 'text')"></div>
+                                    <div class="color-swatch" style="background:#d13438;" onmousedown="event.preventDefault(); applyColor('foreColor', '#d13438', 'text')"></div>
+                                    <div class="color-swatch" style="background:#ffb900;" onmousedown="event.preventDefault(); applyColor('foreColor', '#ffb900', 'text')"></div>
+                                    <div class="color-swatch" style="background:#5c2d91;" onmousedown="event.preventDefault(); applyColor('foreColor', '#5c2d91', 'text')"></div>
+                                    <div class="color-swatch" style="background:#008272;" onmousedown="event.preventDefault(); applyColor('foreColor', '#008272', 'text')"></div>
+                                    <div class="color-swatch" style="background:#ffffff; border-color:#ccc;" onmousedown="event.preventDefault(); applyColor('foreColor', '#ffffff', 'text')"></div>
+                                </div>
+                                <input type="color" id="textNativeColor" style="display:none;" onchange="applyColor('foreColor', this.value, 'text')">
+                                <button class="custom-color-btn" onmousedown="event.preventDefault(); document.getElementById('textNativeColor').click()">Custom...</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                <span class="toolbar-label">Font</span>
+            </div>
+
+            <!-- PARAGRAPH -->
+            <div class="toolbar-group">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <div style="display:flex; gap:2px; align-items:center;">
+                        <button id="btn-insertUnorderedList" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('insertUnorderedList')" title="Bullets"><i class="fas fa-list-ul"></i></button>
+                        <button id="btn-insertOrderedList" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('insertOrderedList')" title="Numbering"><i class="fas fa-list-ol"></i></button>
+                        <div style="width:1px; height:15px; background:#ccc; margin:0 4px;"></div>
+                        <button class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('outdent')" title="Decrease Indent"><i class="fas fa-outdent"></i></button>
+                        <button class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('indent')" title="Increase Indent"><i class="fas fa-indent"></i></button>
+                    </div>
+                    <div style="display:flex; gap:2px; align-items:center;">
+                        <button id="btn-justifyLeft" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('justifyLeft')" title="Align Left"><i class="fas fa-align-left"></i></button>
+                        <button id="btn-justifyCenter" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('justifyCenter')" title="Center"><i class="fas fa-align-center"></i></button>
+                        <button id="btn-justifyRight" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('justifyRight')" title="Align Right"><i class="fas fa-align-right"></i></button>
+                        <button id="btn-justifyFull" class="tool-btn" onmousedown="event.preventDefault();" onclick="formatDoc('justifyFull')" title="Justify"><i class="fas fa-align-justify"></i></button>
+                        <div style="width:1px; height:15px; background:#ccc; margin:0 4px;"></div>
+                        
+                        <select class="tool-select" id="lineSpacingSelect" onchange="setLineSpacing(this.value)" title="Line Spacing" style="width:85px;">
+                            <option value="1.0">1.0</option>
+                            <option value="1.15">1.15</option>
+                            <option value="1.5">1.5</option>
+                            <option value="2.0">2.0</option>
+                            <option value="2.5">2.5</option>
+                            <option value="3.0">3.0</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                    </div>
+                </div>
+                <span class="toolbar-label">Paragraph</span>
+            </div>
+
+            <!-- STYLES -->
+            <div class="toolbar-group">
+                <div style="display:flex; gap:5px; align-items:center;">
+                    <select class="tool-select" id="formatBlockSelect" onchange="formatDoc('formatBlock', this.value)" style="width:110px; height: 35px; border: 1px solid #2b579a; font-weight:bold;">
+                        <option value="DIV">Normal</option>
+                        <option value="H1">Heading 1</option>
+                        <option value="H2">Heading 2</option>
+                        <option value="H3">Heading 3</option>
+                        <option value="H4">Heading 4</option>
+                    </select>
+                </div>
+                <span class="toolbar-label">Styles</span>
+            </div>
+            
+            <!-- EDITING -->
+            <div class="toolbar-group">
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                    <button class="tool-btn" onmousedown="event.preventDefault();" onclick="promptFind()" title="Find Text"><i class="fas fa-search" style="color:#2b579a;"></i> Find</button>
+                </div>
+                <span class="toolbar-label">Editing</span>
+            </div>
+
+        </div>
+
+        <!-- 2. INSERT TAB -->
+        <div class="ribbon-content" id="tab-insert">
+            <div class="toolbar-group">
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="insertPageBreak()"><i class="fas fa-pager" style="color:#d13438;"></i><span>Page Break</span></button>
+                <span class="toolbar-label">Pages</span>
+            </div>
+            <div class="toolbar-group">
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="insertVariable('date')"><i class="far fa-calendar-alt" style="color:#2b579a;"></i><span>Date</span></button>
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="insertVariable('partyA')"><i class="fas fa-user" style="color:#2b579a;"></i><span>Party A</span></button>
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="insertVariable('partyB')"><i class="fas fa-user-friends" style="color:#2b579a;"></i><span>Party B</span></button>
+                <span class="toolbar-label">Variables</span>
+            </div>
+            <div class="toolbar-group">
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="insertTable()"><i class="fas fa-table" style="color:#2b579a;"></i><span>Table</span></button>
+                <input type="file" id="photoUploadInput" accept="image/*" style="display:none;" onchange="insertPhotoFromDisk(event)">
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="document.getElementById('photoUploadInput').click()"><i class="fas fa-image" style="color:#2b579a;"></i><span>Picture</span></button>
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="insertTextBox()"><i class="fas fa-object-group" style="color:#2b579a;"></i><span>Text Box</span></button>
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="formatDoc('insertHorizontalRule')"><i class="fas fa-minus" style="color:#2b579a;"></i><span>Line</span></button>
+                <span class="toolbar-label">Objects</span>
+            </div>
+            <div class="toolbar-group">
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="insertSignatureBlock('A')"><i class="fas fa-signature" style="color:#107c10;"></i><span>Sig A</span></button>
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="insertSignatureBlock('B')"><i class="fas fa-signature" style="color:#107c10;"></i><span>Sig B</span></button>
+                <span class="toolbar-label">eSignature</span>
+            </div>
+        </div>
+
+        <!-- 3. LAYOUT TAB -->
+        <div class="ribbon-content" id="tab-layout">
+            <div class="toolbar-group">
+                <div style="display:flex; gap:10px;">
+                    <div class="toolbar-col">
+                        <select class="tool-select" id="paperSizeSelect" onchange="setPaperSize(this.value)" style="margin-bottom:4px; font-weight:bold;">
+                            <option value="A4">A4 (210 x 297 mm)</option>
+                            <option value="Letter">Letter (8.5 x 11 in)</option>
+                            <option value="Legal">Legal (8.5 x 14 in)</option>
+                            <option value="A5">A5 (148 x 210 mm)</option>
+                        </select>
+                        <span style="font-size:11px; color:#333;"><i class="fas fa-file-alt"></i> Paper Size</span>
+                    </div>
+                    <div class="toolbar-col">
+                        <select class="tool-select" id="marginSelect" onchange="setMargins(this.value)" style="margin-bottom:4px;">
+                            <option value="normal">Normal (25mm)</option>
+                            <option value="narrow">Narrow (12.7mm)</option>
+                            <option value="wide">Wide (50mm)</option>
+                        </select>
+                        <span style="font-size:11px; color:#333;"><i class="fas fa-border-style"></i> Margins</span>
+                    </div>
+                    <div class="toolbar-col">
+                        <select class="tool-select" id="orientationSelect" onchange="setOrientation(this.value)" style="margin-bottom:4px;">
+                            <option value="portrait">Portrait (直向)</option>
+                            <option value="landscape">Landscape (橫向)</option>
+                        </select>
+                        <span style="font-size:11px; color:#333;"><i class="far fa-file"></i> Orientation</span>
+                    </div>
+                </div>
+                <span class="toolbar-label">Page Setup</span>
+            </div>
+        </div>
+
+        <!-- 4. VIEW TAB -->
+        <div class="ribbon-content" id="tab-view">
+            <div class="toolbar-group">
+                <button class="tool-btn large" onmousedown="event.preventDefault();" onclick="toggleGridlines()"><i class="fas fa-th" style="color:#666;"></i><span>Gridlines</span></button>
+                <span class="toolbar-label">Show</span>
+            </div>
+            <div class="toolbar-group">
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <button class="tool-btn" onmousedown="event.preventDefault();" onclick="changeZoom(-0.1)"><i class="fas fa-search-minus"></i></button>
+                    <span id="zoomLabel" style="font-size:13px; width:40px; text-align:center;">100%</span>
+                    <button class="tool-btn" onmousedown="event.preventDefault();" onclick="changeZoom(0.1)"><i class="fas fa-search-plus"></i></button>
+                    <button class="tool-btn" onmousedown="event.preventDefault();" onclick="resetZoom()" style="margin-left:5px; border:1px solid #ccc;">100%</button>
+                </div>
+                <span class="toolbar-label">Zoom</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="workspace">
+
+        <!-- LEFT SIDEBAR -->
+        <div class="sidebar" id="controlPanel">
+            <div class="sidebar-header">
+                Document Setup
+                <button onclick="toggleSidebar()" style="float:right; background:transparent; border:none; cursor:pointer;" class="is-mobile-only-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="sidebar-content">
+                <div class="form-group" style="background:#e1dfdd; padding:10px; border-radius:4px;">
+                    <label><i class="fas fa-file-import"></i> Import Document</label>
+                    <input type="file" id="docUploadInput" accept=".pdf,.docx,.txt" onchange="handleDocumentUpload(event)" style="display:none;">
+                    <button class="btn btn-primary" onclick="document.getElementById('docUploadInput').click()" style="padding:6px; font-size:12px; width:100%; margin-bottom:5px;"><i class="fas fa-upload"></i> Upload PDF/Word</button>
+                    
+                    <input type="file" id="jsonUploadInput" accept=".json" onchange="importDataJson(event)" style="display:none;">
+                    <button class="btn btn-secondary" onclick="document.getElementById('jsonUploadInput').click()" style="padding:6px; font-size:12px; width:100%;"><i class="fas fa-file-download"></i> Load Data (.json)</button>
+                </div>
+
+                <div class="form-group">
+                    <label>Start from Template</label>
+                    <select id="templateSelect" onchange="applyTemplate()">
+                        <option value="blank">Blank Document</option>
+                        <option value="custom" selected>General Agreement</option>
+                        <option value="loan">Small Loan Agreement</option>
+                        <option value="nda">Non-Disclosure Agreement</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Default Party Names</label>
+                    <input type="text" id="inputPartyA" placeholder="Party A Name" style="margin-bottom:5px;">
+                    <input type="text" id="inputTargetName" placeholder="Party B Name">
+                </div>
+                
+                <div style="margin-top: 20px; border-top: 1px solid #e1dfdd; padding-top: 15px;">
+                    <label><i class="fas fa-folder-open"></i> Local Documents</label>
+                    <div style="font-size:11px; color:#605e5c; margin-bottom:10px;">Saved to your browser cache.</div>
+                    <div id="localDocList" style="max-height: 200px; overflow-y: auto;">
+                        <div style="color:#666; font-size:12px;">No documents saved yet.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions-panel">
+                <button class="btn btn-primary" style="background-color:#107c10;" onclick="startNewDocument()"><i class="fas fa-plus"></i> New Document</button>
+                <button class="btn btn-success" onclick="saveToLocal()"><i class="fas fa-save"></i> Save Locally</button>
+                
+                <div id="exportDropdownContainer" style="position:relative; width:100%;">
+                    <button class="btn btn-primary" onclick="toggleExportMenu(event)" style="width:100%;"><i class="fas fa-file-export"></i> Options & Export <i class="fas fa-chevron-down"></i></button>
+                    <div id="exportDropdown" style="display:none; position:absolute; bottom:100%; left:0; width:100%; background:white; border:1px solid #ccc; box-shadow:0 -4px 10px rgba(0,0,0,0.1); border-radius:4px; margin-bottom:5px; z-index:100; overflow:hidden;">
+                        
+                        <button class="btn btn-secondary" style="border:none; border-bottom:1px solid #eee; text-align:left; width:100%; border-radius:0;" onclick="downloadDataJson()"><i class="fas fa-file-code" style="color:#2b579a;"></i> Export Data (.json)</button>
+                        <button class="btn btn-secondary" style="border:none; border-bottom:1px solid #eee; text-align:left; width:100%; border-radius:0;" onclick="exportToWord()"><i class="fas fa-file-word" style="color:#0078d4;"></i> Export to DOCX</button>
+                        <button class="btn btn-secondary" style="border:none; text-align:left; width:100%; border-radius:0;" onclick="window.print()"><i class="fas fa-file-pdf" style="color:#d13438;"></i> Export PDF / Print</button>
+                    </div>
+                </div>
+                <div id="saveStatus" style="font-size: 12px; color: #107c10; text-align: center; display: none; margin-top: 5px; font-weight: bold;"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT AREA: THE A4 PAPER -->
+        <div class="preview-area">
+            <div class="page-preview-wrapper" id="pageWrapper">
+                <div class="page-preview" id="pagePreview">
+                    <!-- Demo Watermark Layer -->
+                    <div class="demo-watermark"></div>
+                    
+                    <!-- TABLE CONTEXT MENU -->
+                    <div id="tableContextMenu">
+                        <button class="table-ctx-btn" onclick="tdAddRow()" title="Add Row Below"><i class="fas fa-level-down-alt"></i> Row</button>
+                        <button class="table-ctx-btn" onclick="tdAddCol()" title="Add Column Right"><i class="fas fa-step-forward"></i> Col</button>
+                        <div class="table-ctx-divider"></div>
+                        <button class="table-ctx-btn" onclick="tdDelRow()" title="Delete Row"><i class="fas fa-minus" style="color:#d13438;"></i> Row</button>
+                        <button class="table-ctx-btn" onclick="tdDelCol()" title="Delete Column"><i class="fas fa-minus" style="color:#d13438;"></i> Col</button>
+                        <div class="table-ctx-divider"></div>
+                        <button class="table-ctx-btn" onclick="tdDelTable()" title="Delete Table"><i class="fas fa-trash" style="color:#d13438;"></i></button>
+                    </div>
+
+                    <div id="editorContent" contenteditable="true">
+                        <!-- Loaded dynamically -->
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SIGNATURE MODAL -->
+    <div id="sigModal">
+        <div class="modal-content">
+            <h3 style="margin-top:0; color:#323130;">Please Sign Here</h3>
+            <canvas id="sigCanvas"></canvas>
+            <div class="modal-buttons">
+                <input type="file" id="modalSigUpload" accept="image/*" style="display:none;" onchange="handleModalSigUpload(event)">
+                <button class="btn btn-secondary" style="width:auto;" onclick="document.getElementById('modalSigUpload').click()"><i class="fas fa-upload"></i> Upload</button>
+                <button class="btn btn-secondary" style="background:#c5c21b; color:white; border:none; width:auto;"onclick="clearPad()">Clear</button>
+                <button class="btn btn-secondary" style="background:#d13438; color:white; border:none; width:auto;" onclick="closePad()" style="width:auto;">Cancel</button>
+                <button class="btn btn-success" onclick="confirmPad()" style="width:auto;">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Data Storage -->
+    <input type="hidden" id="lenderSigData" value="">
+    <input type="hidden" id="borrowerSigData" value="">
+    <input type="hidden" id="todayDateDisp" value="">
+    <input type="hidden" id="currentDocId" value="">
+
+    <script>
+        let currentSigningRole = null;
+        let canvas, ctx, isDrawing = false;
+        let savedSelection = null;
+        let sidebarWasVisible = true;
+        let isFocusMode = false;
+
+        let currentPaperSize = 'A4';
+        let currentOrientation = 'portrait';
+        let currentMargins = 'normal';
+
+        function generateId() { return 'doc_' + Date.now().toString(36) + Math.random().toString(36).substr(2); }
+
+        function startNewDocument() {
+            if(confirm("Start a new document? Unsaved changes will be lost.")) {
+                document.getElementById('currentDocId').value = "";
+                document.getElementById('documentNameInput').value = "Untitled Document";
+                document.getElementById('inputPartyA').value = "";
+                document.getElementById('inputTargetName').value = "";
+                document.getElementById('lenderSigData').value = "";
+                document.getElementById('borrowerSigData').value = "";
+                document.getElementById('templateSelect').value = "custom";
+                applyTemplate();
+            }
+        }
+
+        // --- LOCAL STORAGE LOGIC ---
+        function getLocalDocs() {
+            let docs = localStorage.getItem('local_agreements');
+            return docs ? JSON.parse(docs) : [];
+        }
+        function saveDocsToLocal(docsArray) {
+            localStorage.setItem('local_agreements', JSON.stringify(docsArray));
+            renderLocalDocs();
+        }
+        function saveToLocal() {
+            let docs = getLocalDocs();
+            let docId = document.getElementById('currentDocId').value;
+            if(!docId) docId = generateId();
+
+            let docData = {
+                id: docId,
+                name: document.getElementById('documentNameInput').value || 'Untitled',
+                date: new Date().toISOString(),
+                partyA: document.getElementById('inputPartyA').value,
+                partyB: document.getElementById('inputTargetName').value,
+                paperSize: document.getElementById('paperSizeSelect').value,
+                orientation: document.getElementById('orientationSelect').value,
+                margins: document.getElementById('marginSelect').value,
+                sigA: document.getElementById('lenderSigData').value,
+                sigB: document.getElementById('borrowerSigData').value,
+                html: getCleanHTMLForSave()
+            };
+
+            let existingIndex = docs.findIndex(d => d.id === docId);
+            if(existingIndex >= 0) docs[existingIndex] = docData;
+            else docs.push(docData);
+
+            document.getElementById('currentDocId').value = docId;
+            saveDocsToLocal(docs);
+
+            const statusMsg = document.getElementById('saveStatus'); 
+            if(statusMsg) {
+                statusMsg.innerHTML = '<i class="fas fa-check-circle"></i> Saved Locally!'; 
+                statusMsg.style.display = 'block';
+                setTimeout(() => { statusMsg.style.display = 'none'; }, 3000); 
+            }
+        }
+        function loadFromLocal(docId) {
+            let docs = getLocalDocs();
+            let doc = docs.find(d => d.id === docId);
+            if(doc) {
+                document.getElementById('currentDocId').value = doc.id;
+                document.getElementById('documentNameInput').value = doc.name;
+                document.getElementById('inputPartyA').value = doc.partyA;
+                document.getElementById('inputTargetName').value = doc.partyB;
+                
+                document.getElementById('paperSizeSelect').value = doc.paperSize || 'A4';
+                document.getElementById('orientationSelect').value = doc.orientation || 'portrait';
+                document.getElementById('marginSelect').value = doc.margins || 'normal';
+                currentPaperSize = doc.paperSize || 'A4';
+                currentOrientation = doc.orientation || 'portrait';
+                currentMargins = doc.margins || 'normal';
+                
+                document.getElementById('lenderSigData').value = doc.sigA || "";
+                document.getElementById('borrowerSigData').value = doc.sigB || "";
+                document.getElementById('editorContent').innerHTML = doc.html || "";
+                
+                updatePaperSetup();
+                syncSignaturesToDOM();
+                attachDragAndResizeEvents();
+            }
+        }
+        function deleteLocalDoc(docId) {
+            if(confirm("Delete this saved document?")) {
+                let docs = getLocalDocs();
+                docs = docs.filter(d => d.id !== docId);
+                saveDocsToLocal(docs);
+                if(document.getElementById('currentDocId').value === docId) {
+                    startNewDocument();
+                }
+            }
+        }
+        function renderLocalDocs() {
+            let docs = getLocalDocs();
+            let container = document.getElementById('localDocList');
+            if(docs.length === 0) {
+                container.innerHTML = '<div style="color:#666; font-size:12px;">No documents saved yet.</div>';
+                return;
+            }
+            container.innerHTML = '';
+            docs.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(doc => {
+                let div = document.createElement('div');
+                div.className = 'list-item';
+                div.innerHTML = `
+                    <strong>${doc.name}</strong>
+                    <span style="font-size:10px; color:#888;">${new Date(doc.date).toLocaleString()}</span>
+                    <div class="list-item-actions">
+                        <button onclick="loadFromLocal('${doc.id}')"><i class="fas fa-folder-open"></i> Open</button>
+                        <button class="delete-btn" onclick="deleteLocalDoc('${doc.id}')"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- EXPORT / IMPORT JSON ---
+        function downloadDataJson() {
+            let docData = {
+                name: document.getElementById('documentNameInput').value || 'Untitled',
+                partyA: document.getElementById('inputPartyA').value,
+                partyB: document.getElementById('inputTargetName').value,
+                paperSize: document.getElementById('paperSizeSelect').value,
+                orientation: document.getElementById('orientationSelect').value,
+                margins: document.getElementById('marginSelect').value,
+                sigA: document.getElementById('lenderSigData').value,
+                sigB: document.getElementById('borrowerSigData').value,
+                html: getCleanHTMLForSave()
+            };
+            let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(docData));
+            let downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href",     dataStr);
+            downloadAnchorNode.setAttribute("download", docData.name + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            document.getElementById('exportDropdown').style.display = 'none';
+        }
+        function importDataJson(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let doc = JSON.parse(e.target.result);
+                    document.getElementById('currentDocId').value = generateId(); // Assign new ID to imported file
+                    document.getElementById('documentNameInput').value = doc.name || "Imported Document";
+                    document.getElementById('inputPartyA').value = doc.partyA || "";
+                    document.getElementById('inputTargetName').value = doc.partyB || "";
+                    
+                    if(doc.paperSize) { document.getElementById('paperSizeSelect').value = doc.paperSize; currentPaperSize = doc.paperSize; }
+                    if(doc.orientation) { document.getElementById('orientationSelect').value = doc.orientation; currentOrientation = doc.orientation; }
+                    if(doc.margins) { document.getElementById('marginSelect').value = doc.margins; currentMargins = doc.margins; }
+                    
+                    document.getElementById('lenderSigData').value = doc.sigA || "";
+                    document.getElementById('borrowerSigData').value = doc.sigB || "";
+                    document.getElementById('editorContent').innerHTML = doc.html || "";
+                    
+                    updatePaperSetup();
+                    syncSignaturesToDOM();
+                    attachDragAndResizeEvents();
+                } catch(err) {
+                    alert("Invalid JSON file.");
+                }
+            };
+            reader.readAsText(file);
+            document.getElementById('jsonUploadInput').value = '';
+        }
+
+        // --- UI UTILS ---
+        function restoreSelection() {
+            const editor = document.getElementById('editorContent');
+            editor.focus();
+            if (savedSelection) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedSelection);
+            }
+        }
+
+        function toggleTopBar() {
+            isFocusMode = !isFocusMode;
+            
+            let sidebar = document.getElementById('controlPanel');
+            let docName = document.getElementById('documentNameInput').value || 'Untitled Document';
+
+            if (isFocusMode) {
+                if(sidebar) {
+                    sidebarWasVisible = (sidebar.style.display !== 'none');
+                    sidebar.style.display = 'none';
+                }
+                document.querySelector('.top-navbar').style.display = 'none';
+                document.getElementById('mainRibbon').style.display = 'none';
+                document.getElementById('floatingTopToggle').innerText = docName;
+                document.getElementById('floatingTopToggle').style.display = 'block';
+            } else {
+                if(sidebar && sidebarWasVisible && window.innerWidth > 768) {
+                    sidebar.style.display = 'flex';
+                }
+                document.querySelector('.top-navbar').style.display = 'flex';
+                document.getElementById('mainRibbon').style.display = 'block';
+                document.getElementById('floatingTopToggle').style.display = 'none';
+            }
+            updatePaperSetup(); 
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('controlPanel');
+            if (!sidebar) return; 
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('active-mobile');
+            } else {
+                sidebar.style.display = (sidebar.style.display === 'none') ? 'flex' : 'none';
+            }
+        }
+
+        function toggleExportMenu(e) {
+            let menu = document.getElementById('exportDropdown');
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+            if(e) e.stopPropagation();
+        }
+        
+        document.addEventListener('click', function(e) {
+            let ed = document.getElementById('exportDropdown');
+            if (ed && ed.style.display === 'block' && !e.target.closest('#exportDropdownContainer')) {
+                ed.style.display = 'none';
+            }
+        });
+
+        // --- PAPER SETUP ---
+        const paperDims = {
+            'A4': { w: '210mm', h: '297mm' },
+            'Letter': { w: '215.9mm', h: '279.4mm' }, 
+            'Legal': { w: '215.9mm', h: '355.6mm' },  
+            'A5': { w: '148mm', h: '210mm' }
+        };
+
+        function updatePaperSetup() {
+            const page = document.getElementById('pagePreview');
+            let dim = paperDims[currentPaperSize];
+            if (currentOrientation === 'portrait') {
+                page.style.width = dim.w;
+                page.style.minHeight = dim.h;
+            } else {
+                page.style.width = dim.h;
+                page.style.minHeight = dim.w;
+            }
+            
+            let paddingVal = document.getElementById('marginSelect') ? document.getElementById('marginSelect').value : currentMargins;
+            let padMm = paddingVal==='narrow'? '12.7mm' : (paddingVal==='wide'? '50mm' : '25mm');
+            page.style.padding = padMm;
+            
+            document.querySelectorAll('.page-break-indicator').forEach(el => {
+                el.style.marginLeft = '-' + padMm;
+                el.style.width = 'calc(100% + (' + padMm + ' * 2))';
+            });
+
+            let printStyle = document.getElementById('print-page-style');
+            if (!printStyle) {
+                printStyle = document.createElement('style');
+                printStyle.id = 'print-page-style';
+                document.head.appendChild(printStyle);
+            }
+            printStyle.innerHTML = `@page { size: ${currentPaperSize} ${currentOrientation}; margin: 0; }`;
+        }
+        function setPaperSize(size) { currentPaperSize = size; updatePaperSetup(); }
+        function setOrientation(ori) { currentOrientation = ori; updatePaperSetup(); }
+        function setMargins(type) { currentMargins = type; updatePaperSetup(); }
+
+        function exportToWord() {
+            var header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export Document</title></head><body>";
+            var footer = "</body></html>";
+            
+            var clone = document.getElementById('editorContent').cloneNode(true);
+            clone.querySelectorAll('.drag-handle, .resize-handle, .block-float-btn, .block-fit-btn, .block-delete-btn, .page-break-indicator').forEach(el => el.remove());
+            
+            var sourceHTML = header + clone.innerHTML + footer;
+            var source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+            
+            var fileDownload = document.createElement("a");
+            document.body.appendChild(fileDownload);
+            fileDownload.href = source;
+            let docName = document.getElementById('documentNameInput').value || 'document';
+            fileDownload.download = docName + '.doc';
+            fileDownload.click();
+            document.body.removeChild(fileDownload);
+            document.getElementById('exportDropdown').style.display = 'none';
+        }
+
+        function handlePaste() {
+            navigator.clipboard.readText().then(text => {
+                document.getElementById('editorContent').focus();
+                document.execCommand('insertText', false, text);
+            }).catch(err => {
+                alert("Please use Ctrl+V (or Cmd+V) to paste due to browser security settings.");
+            });
+        }
+        function promptFind() {
+            let text = prompt("Enter text to find:");
+            if(text) window.find(text);
+        }
+
+        function setLineSpacing(val) {
+            if (val === 'custom') {
+                val = prompt("Enter custom line spacing (e.g., 1.25, 2.0, 15px):", "1.5");
+                if (!val) { document.getElementById('lineSpacingSelect').selectedIndex = 0; return; }
+            }
+            let node = window.getSelection().anchorNode;
+            if (node) {
+                if (node.nodeType === 3) node = node.parentNode; 
+                while (node && node !== document.getElementById('editorContent') && window.getComputedStyle(node).display === 'inline') {
+                    node = node.parentNode;
+                }
+                if (node && node !== document.getElementById('editorContent')) {
+                    node.style.lineHeight = val;
+                } else {
+                    document.getElementById('editorContent').style.lineHeight = val;
+                }
+            }
+        }
+
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        }
+
+        function handleDocumentUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            let fileNameBase = file.name.substring(0, file.name.lastIndexOf('.'));
+            if(document.getElementById('documentNameInput')) {
+                document.getElementById('documentNameInput').value = fileNameBase;
+            }
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            const editor = document.getElementById('editorContent');
+            editor.innerHTML = '<div style="text-align:center; padding: 50px; color:#2b579a;"><i class="fas fa-spinner fa-spin fa-2x"></i><br><br>Processing document... Please wait.</div>';
+
+            if (ext === 'docx') {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    mammoth.convertToHtml({arrayBuffer: e.target.result}, {
+                        styleMap: [
+                            "p[style-name='Normal'] => p:fresh",
+                            "h1 => h1:fresh",
+                            "h2 => h2:fresh",
+                            "h3 => h3:fresh",
+                            "h4 => h4:fresh",
+                            "table => table.imported-table"
+                        ]
+                    }).then(function(result){
+                        let wrap = document.createElement('div');
+                        wrap.innerHTML = result.value + "<br><br>";
+                        
+                        let currentFont = document.getElementById('fontFamilySelect') ? document.getElementById('fontFamilySelect').value : 'inherit';
+                        let currentSize = document.getElementById('fontSizeInput') ? document.getElementById('fontSizeInput').value + 'px' : '16px';
+                        
+                        wrap.querySelectorAll('p, span, div, td, th').forEach(el => {
+                            el.style.fontFamily = currentFont;
+                            el.style.fontSize = currentSize;
+                        });
+                        
+                        wrap.querySelectorAll('table').forEach(t => {
+                            t.style.width = '100%';
+                            t.style.borderCollapse = 'collapse';
+                            t.querySelectorAll('td, th').forEach(cell => {
+                                cell.style.border = '1px solid #000';
+                                cell.style.padding = '8px';
+                            });
+                        });
+
+                        editor.innerHTML = wrap.innerHTML;
+                        syncSignaturesToDOM();
+                        attachDragAndResizeEvents();
+                    }).catch(err => {
+                        alert("Error loading Word file: " + err.message);
+                        editor.innerHTML = '';
+                    });
+                };
+                reader.readAsArrayBuffer(file);
+            } else if (ext === 'pdf') {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const typedarray = new Uint8Array(e.target.result);
+                    pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                        let pagesPromises = [];
+                        for(let i = 1; i <= pdf.numPages; i++) {
+                            pagesPromises.push(pdf.getPage(i).then(page => {
+                                const viewport = page.getViewport({scale: 1.5}); 
+                                const canvasEl = document.createElement('canvas');
+                                const ctxEl = canvasEl.getContext('2d');
+                                canvasEl.height = viewport.height;
+                                canvasEl.width = viewport.width;
+                                return page.render({canvasContext: ctxEl, viewport: viewport}).promise.then(() => {
+                                    return `<div>&nbsp;<div class="free-move-block pdf-page-block" contenteditable="false" tabindex="0" style="width: 100%; max-width: 100%; top: 0px; left: 0px;">
+                                                <button class="block-float-btn" onclick="toggleFloatMode(this)" title="Enable Float Mode (Overlay)"><i class="fas fa-layer-group"></i></button>
+                                                <button class="block-fit-btn" onclick="fitToPage(this)" title="Snap to Full Page"><i class="fas fa-expand"></i></button>
+                                                <div class="drag-handle" title="Drag to move"><i class="fas fa-arrows-alt"></i></div>
+                                                <div class="resize-handle" title="Drag to resize"></div>
+                                                <button class="block-delete-btn" onclick="this.parentElement.parentElement.remove()" title="Delete Page"><i class="fas fa-times"></i></button>
+                                                <img src="${canvasEl.toDataURL('image/jpeg', 0.8)}" style="width: 100%; height: auto; pointer-events: none; border: 1px solid #ccc;">
+                                            </div>&nbsp;</div><br>`;
+                                });
+                            }));
+                        }
+                        Promise.all(pagesPromises).then(pagesHtml => {
+                            editor.innerHTML = pagesHtml.join('') + `<div style="min-height: 50px;"><br></div>`;
+                            document.getElementById('docUploadInput').value = '';
+                            attachDragAndResizeEvents();
+                        });
+                    }).catch(err => {
+                        alert("Error loading PDF: " + err.message);
+                        editor.innerHTML = '';
+                    });
+                };
+                reader.readAsArrayBuffer(file);
+            } else if (ext === 'txt') {
+                const reader = new FileReader();
+                reader.onload = function(e) { 
+                    editor.innerText = e.target.result; 
+                }
+                reader.readAsText(file);
+            } else {
+                alert("Unsupported file format. Please upload PDF, DOCX, or TXT.");
+                editor.innerHTML = '';
+            }
+        }
+
+        document.addEventListener('selectionchange', () => {
+            const editor = document.getElementById('editorContent');
+            if (editor && (document.activeElement === editor || editor.contains(document.activeElement))) {
+                const sel = window.getSelection();
+                if (sel.rangeCount > 0) savedSelection = sel.getRangeAt(0);
+                
+                const cmds = ['bold', 'italic', 'underline', 'strikeThrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList'];
+                cmds.forEach(cmd => {
+                    const state = document.queryCommandState(cmd);
+                    const btn = document.getElementById('btn-' + cmd);
+                    if(btn) {
+                        if(state) btn.classList.add('active');
+                        else btn.classList.remove('active');
+                    }
+                });
+
+                try {
+                    let font = document.queryCommandValue('fontName');
+                    if(font) {
+                        font = font.replace(/['"]/g, '');
+                        const fontSelect = document.getElementById('fontFamilySelect');
+                        for(let opt of fontSelect.options) {
+                            if(opt.value.replace(/['"]/g, '').startsWith(font) || font.startsWith(opt.value.replace(/['"]/g, ''))) {
+                                fontSelect.value = opt.value; break;
+                            }
+                        }
+                    }
+                } catch(e) {}
+            }
+        });
+
+        function toggleColorPalette(type) {
+            const pal = document.getElementById(type + 'ColorPalette');
+            pal.style.display = pal.style.display === 'block' ? 'none' : 'block';
+        }
+        function applyColor(cmd, colorHex, type) {
+            document.getElementById(type + 'ColorPalette').style.display = 'none';
+            document.getElementById(type + 'ColorIndicator').style.background = colorHex;
+            formatDoc(cmd, colorHex);
+        }
+        document.addEventListener('mousedown', function(e) {
+            if(!e.target.closest('#textColorPalette') && !e.target.closest('[onclick="toggleColorPalette(\'text\')"]')) {
+                let el = document.getElementById('textColorPalette');
+                if(el) el.style.display = 'none';
+            }
+            if(!e.target.closest('#bgColorPalette') && !e.target.closest('[onclick="toggleColorPalette(\'bg\')"]')) {
+                let el = document.getElementById('bgColorPalette');
+                if(el) el.style.display = 'none';
+            }
+        });
+
+        let activeTableCell = null;
+        document.getElementById('editorContent').addEventListener('click', function(e) {
+            let td = e.target.closest('td, th');
+            if(td && document.getElementById('editorContent').contains(td)) {
+                activeTableCell = td;
+                const menu = document.getElementById('tableContextMenu');
+                menu.style.display = 'flex';
+                const previewRect = document.getElementById('pagePreview').getBoundingClientRect();
+                const tdRect = td.getBoundingClientRect();
+                menu.style.top = ((tdRect.top - previewRect.top) / currentZoom - 40) + 'px';
+                menu.style.left = ((tdRect.left - previewRect.left) / currentZoom) + 'px';
+            } else {
+                if(!e.target.closest('#tableContextMenu')) {
+                    document.getElementById('tableContextMenu').style.display = 'none';
+                    activeTableCell = null;
+                }
+            }
+        });
+
+        function tdAddRow() {
+            if(!activeTableCell) return;
+            const tr = activeTableCell.closest('tr');
+            const colCount = tr.children.length;
+            let newTr = document.createElement('tr');
+            for(let i=0; i<colCount; i++) { newTr.innerHTML += '<td style="border:1px solid #000; padding:8px;">New Cell</td>'; }
+            tr.parentNode.insertBefore(newTr, tr.nextSibling);
+        }
+        function tdAddCol() {
+            if(!activeTableCell) return;
+            const table = activeTableCell.closest('table');
+            const index = Array.from(activeTableCell.parentNode.children).indexOf(activeTableCell);
+            for(let row of table.rows) {
+                let newTd = document.createElement(row.children[0].tagName);
+                newTd.style.border = '1px solid #000'; newTd.style.padding = '8px'; newTd.innerText = 'New Cell';
+                if(row.children[index]) row.insertBefore(newTd, row.children[index].nextSibling);
+                else row.appendChild(newTd);
+            }
+        }
+        function tdDelRow() {
+            if(!activeTableCell) return;
+            const tr = activeTableCell.closest('tr');
+            if(tr.parentNode.children.length > 1) tr.remove();
+            else activeTableCell.closest('table').remove();
+            document.getElementById('tableContextMenu').style.display = 'none';
+        }
+        function tdDelCol() {
+            if(!activeTableCell) return;
+            const table = activeTableCell.closest('table');
+            const index = Array.from(activeTableCell.parentNode.children).indexOf(activeTableCell);
+            for(let row of table.rows) { if(row.children[index]) row.children[index].remove(); }
+            if(table.rows[0].children.length === 0) table.remove();
+            document.getElementById('tableContextMenu').style.display = 'none';
+        }
+        function tdDelTable() {
+            if(!activeTableCell) return;
+            activeTableCell.closest('table').remove();
+            document.getElementById('tableContextMenu').style.display = 'none';
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.ribbon-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.ribbon-content').forEach(c => c.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+        }
+        
+        function toggleGridlines() { document.getElementById('pagePreview').classList.toggle('gridlines-active'); }
+        
+        let currentZoom = 1.0;
+        function changeZoom(delta) {
+            currentZoom += delta;
+            if(currentZoom < 0.3) currentZoom = 0.3;
+            if(currentZoom > 2.0) currentZoom = 2.0;
+            applyZoom();
+        }
+        function resetZoom() { currentZoom = 1.0; applyZoom(); }
+        function applyZoom() {
+            document.getElementById('pageWrapper').style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoomLabel').innerText = Math.round(currentZoom * 100) + '%';
+        }
+
+        function toggleFloatMode(btn) {
+            const block = btn.closest('.free-move-block');
+            if(block.style.position === 'absolute') {
+                block.style.position = 'relative'; 
+                block.style.top = '0px'; block.style.left = '0px';
+                btn.style.background = '#ffb900'; 
+                btn.title = "Enable Float Mode (Overlay)";
+            } else {
+                block.style.position = 'absolute'; 
+                btn.style.background = '#107c10'; 
+                btn.title = "Disable Float Mode (Back to Text)";
+            }
+        }
+
+        function fitToPage(btn) {
+            const block = btn.closest('.free-move-block');
+            let padMm = document.getElementById('pagePreview').style.padding || '25mm';
+            let icon = btn.querySelector('i');
+            
+            if (block.dataset.isFitted === 'true') {
+                block.style.left = block.dataset.origLeft || '0px';
+                block.style.top = block.dataset.origTop || '0px';
+                block.style.width = block.dataset.origWidth || '250px';
+                if (block.dataset.origPosition) {
+                    block.style.position = block.dataset.origPosition;
+                }
+                
+                let floatBtn = block.querySelector('.block-float-btn');
+                if (floatBtn) {
+                    floatBtn.style.background = block.style.position === 'absolute' ? '#107c10' : '#ffb900';
+                }
+                
+                block.dataset.isFitted = 'false';
+                icon.className = 'fas fa-expand';
+                btn.title = "Snap to Full Page";
+            } else {
+                block.dataset.origLeft = block.style.left;
+                block.dataset.origTop = block.style.top;
+                block.dataset.origWidth = block.style.width;
+                block.dataset.origPosition = block.style.position;
+
+                let floatBtn = block.querySelector('.block-float-btn');
+                if (floatBtn && block.style.position !== 'absolute') {
+                    block.style.position = 'absolute';
+                    floatBtn.style.background = '#107c10';
+                }
+                
+                block.style.left = '-' + padMm;
+                block.style.top = '-' + padMm;
+                block.style.width = 'calc(100% + (' + padMm + ' * 2))';
+                let img = block.querySelector('img');
+                if (img) img.style.width = '100%';
+
+                block.dataset.isFitted = 'true';
+                icon.className = 'fas fa-compress';
+                btn.title = "Restore Original Size";
+            }
+        }
+
+        function insertPageBreak() {
+            restoreSelection();
+            let html = `<div class="page-break-indicator" contenteditable="false"></div><div style="min-height:20px;"><br></div>`;
+            document.execCommand('insertHTML', false, html);
+            updatePaperSetup(); 
+        }
+
+        function getSigHTML(role) {
+            let roleId = role === 'A' ? 'lender' : 'borrower';
+            let defaultTitle = role === 'A' ? '甲方簽署 (Party A Signature)' : '乙方簽署 (Party B Signature)';
+            
+            let partyAName = document.getElementById('inputPartyA') ? document.getElementById('inputPartyA').value : '[Name A]';
+            let partyBName = document.getElementById('inputTargetName') ? document.getElementById('inputTargetName').value : '[Name B]';
+            let defaultName = role === 'A' ? partyAName : partyBName;
+            if(!defaultName) defaultName = (role === 'A') ? '[Name A]' : '[Name B]';
+
+            return `<div style="text-align: left;">&nbsp;<div class="free-move-block" contenteditable="false" tabindex="0" style="width: 280px; text-align: left; top: 0px; left: 0px;">
+                <button class="block-float-btn" onclick="toggleFloatMode(this)" title="Enable Float Mode (Overlay on PDFs)"><i class="fas fa-layer-group"></i></button>
+                <div class="drag-handle" title="Drag to move"><i class="fas fa-arrows-alt"></i></div>
+                <div class="resize-handle" title="Drag to resize"></div>
+                <button class="block-delete-btn" onclick="this.parentElement.parentElement.remove()" title="Delete Block"><i class="fas fa-times"></i></button>
+                <div class="sig-title" contenteditable="true" style="font-weight:bold; margin-bottom:5px; font-size:14px; outline:none;">${defaultTitle}</div>
+                <div id="container-${roleId}" onclick="openPad('${roleId}')" style="border-bottom: 2px solid #000; height: 60px; position: relative; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.02);">
+                    <span class="sig-placeholder" style="color:#888; font-size:12px; margin-bottom:2px;">Click to Sign</span>
+                </div>
+                <div class="sig-name" contenteditable="true" style="margin-top:5px; font-size:14px; outline:none;">Name: ${defaultName}</div>
+            </div>&nbsp;</div><br>`;
+        }
+
+        const templates = {
+            blank: "<div><br></div>",
+            custom: `<h1>一般協議書</h1><div><br></div><div>本協議由 [點擊插入甲方] (下稱甲方) 與 [點擊插入乙方] (下稱乙方) 於 [點擊插入日期] 簽訂。</div><div><br></div><div>雙方同意以下條款：</div><ul><li><br></li></ul><hr><div><b>備注：</b>本協議經雙方簽署後即時生效。</div><div><br></div>` + getSigHTML('A') + getSigHTML('B'),
+            loan: `<h1>小額借款協議</h1><h2>Small Loan Agreement</h2><div><br></div><div>日期 (Date): [點擊插入日期]</div><div><br></div><div><b>貸方 (Lender):</b> [點擊插入甲方]</div><div><b>借方 (Borrower):</b> [點擊插入乙方]</div><hr><div><ol><li>乙方 同意向 甲方 借款，金額為港幣 ________ 元正。</li><li>乙方 須於 ____ 年 __ 月 __ 日前全數歸還款項。</li><li>本借款不涉及任何利息或附加費。</li></ol></div><div><i>本協議經雙方簽署後即時生效。</i></div><div><br></div>` + getSigHTML('A') + getSigHTML('B'),
+            nda: `<h1>保密協議 (NDA)</h1><div><br></div><div>日期: [點擊插入日期]</div><div><b>披露方:</b> [點擊插入甲方]</div><div><b>接收方:</b> [點擊插入乙方]</div><hr><ol><li>接收方承諾對披露方提供的所有商業機密及技術資料嚴格保密。</li><li>未經披露方書面同意，接收方不得向第三方透露、複製或作其他商業用途。</li><li>保密義務不因本協議終止而失效。</li></ol><div><br></div>` + getSigHTML('A') + getSigHTML('B')
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if(document.getElementById('paperSizeSelect')) document.getElementById('paperSizeSelect').value = currentPaperSize;
+            if(document.getElementById('orientationSelect')) document.getElementById('orientationSelect').value = currentOrientation;
+            if(document.getElementById('marginSelect')) document.getElementById('marginSelect').value = currentMargins;
+
+            updatePaperSetup(); 
+            setTodayDate();
+            canvas = document.getElementById('sigCanvas');
+            ctx = canvas.getContext('2d');
+            setupCanvasEvents();
+
+            applyTemplate();
+            syncSignaturesToDOM();
+            attachDragAndResizeEvents();
+            renderLocalDocs();
+            
+            if (window.innerWidth <= 768) {
+                let cp = document.getElementById('controlPanel');
+                if (cp) cp.classList.remove('active-mobile');
+                let targetZoom = (window.innerWidth - 20) / 850; 
+                if(targetZoom < 0.25) targetZoom = 0.25;
+                currentZoom = parseFloat(targetZoom.toFixed(2));
+                applyZoom();
+            }
+        });
+
+        let isDragging = false;
+        let isResizing = false;
+        let currentActionEl = null;
+        let startX = 0, startY = 0;
+        let startLeft = 0, startTop = 0;
+        let startWidth = 0, startHeight = 0;
+
+        function attachDragAndResizeEvents() {
+            document.querySelectorAll('.free-move-block').forEach(block => {
+                if (block.dataset.eventsBound) return;
+                block.dataset.eventsBound = "true";
+                
+                // DRAG HANDLE
+                const dragHandle = block.querySelector('.drag-handle');
+                if (dragHandle) {
+                    dragHandle.addEventListener('mousedown', function(e) {
+                        isDragging = true; 
+                        currentActionEl = block;
+                        startX = e.clientX; startY = e.clientY;
+                        startLeft = parseInt(block.style.left || 0);
+                        startTop = parseInt(block.style.top || 0);
+                        block.focus(); e.stopPropagation(); e.preventDefault();
+                    });
+                    dragHandle.addEventListener('touchstart', function(e) {
+                        isDragging = true; currentActionEl = block;
+                        startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+                        startLeft = parseInt(block.style.left || 0); startTop = parseInt(block.style.top || 0);
+                        block.focus(); e.stopPropagation(); 
+                    });
+                }
+
+                // RESIZE HANDLE
+                const resizeHandle = block.querySelector('.resize-handle');
+                if (resizeHandle) {
+                    resizeHandle.addEventListener('mousedown', function(e) {
+                        isResizing = true; 
+                        currentActionEl = block;
+                        startX = e.clientX; startY = e.clientY;
+                        startWidth = block.offsetWidth;
+                        startHeight = block.offsetHeight;
+                        block.focus(); e.stopPropagation(); e.preventDefault();
+                    });
+                    resizeHandle.addEventListener('touchstart', function(e) {
+                        isResizing = true; currentActionEl = block;
+                        startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+                        startWidth = block.offsetWidth; startHeight = block.offsetHeight;
+                        block.focus(); e.stopPropagation(); 
+                    });
+                }
+
+                // KEYBOARD MOVING
+                block.addEventListener('keydown', function(e) {
+                    if (document.activeElement === block) {
+                        let top = parseInt(block.style.top || 0);
+                        let left = parseInt(block.style.left || 0);
+                        let step = e.shiftKey ? 10 : 2; 
+                        
+                        if (e.key === 'ArrowUp') { top -= step; e.preventDefault(); }
+                        else if (e.key === 'ArrowDown') { top += step; e.preventDefault(); }
+                        else if (e.key === 'ArrowLeft') { left -= step; e.preventDefault(); }
+                        else if (e.key === 'ArrowRight') { left += step; e.preventDefault(); }
+                        else if (e.key === 'Backspace' || e.key === 'Delete') {
+                            if (block.parentElement.style.textAlign) block.parentElement.remove();
+                            else block.remove();
+                            e.preventDefault();
+                        }
+                        
+                        block.style.top = top + 'px';
+                        block.style.left = left + 'px';
+                    }
+                });
+            });
+        }
+
+        document.addEventListener('mousemove', function(e) {
+            if (isDragging && currentActionEl) {
+                let dx = (e.clientX - startX) / currentZoom;
+                let dy = (e.clientY - startY) / currentZoom;
+                currentActionEl.style.left = (startLeft + dx) + 'px';
+                currentActionEl.style.top = (startTop + dy) + 'px';
+            } else if (isResizing && currentActionEl) {
+                let dx = (e.clientX - startX) / currentZoom;
+                let dy = (e.clientY - startY) / currentZoom;
+                currentActionEl.style.width = Math.max(50, startWidth + dx) + 'px';
+                
+                if (!currentActionEl.querySelector('img')) {
+                    currentActionEl.style.minHeight = Math.max(30, startHeight + dy) + 'px';
+                }
+            }
+        });
+        
+        document.addEventListener('touchmove', function(e) {
+            if (isDragging && currentActionEl) {
+                let dx = (e.touches[0].clientX - startX) / currentZoom;
+                let dy = (e.touches[0].clientY - startY) / currentZoom;
+                currentActionEl.style.left = (startLeft + dx) + 'px';
+                currentActionEl.style.top = (startTop + dy) + 'px';
+                e.preventDefault(); 
+            } else if (isResizing && currentActionEl) {
+                let dx = (e.touches[0].clientX - startX) / currentZoom;
+                let dy = (e.touches[0].clientY - startY) / currentZoom;
+                currentActionEl.style.width = Math.max(50, startWidth + dx) + 'px';
+                if (!currentActionEl.querySelector('img')) {
+                    currentActionEl.style.minHeight = Math.max(30, startHeight + dy) + 'px';
+                }
+                e.preventDefault(); 
+            }
+        }, {passive: false});
+
+        document.addEventListener('mouseup', function() { isDragging = false; isResizing = false; currentActionEl = null; });
+        document.addEventListener('touchend', function() { isDragging = false; isResizing = false; currentActionEl = null; });
+
+        const PRESET_FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+        function toggleFontSizeDropdown() { const list = document.getElementById('fontSizeList'); list.style.display = list.style.display === 'block' ? 'none' : 'block'; }
+        document.addEventListener('mousedown', function(e) {
+            const container = document.getElementById('fontSizeDropdownContainer');
+            const list = document.getElementById('fontSizeList');
+            if (list && list.style.display === 'block' && !container.contains(e.target)) list.style.display = 'none';
+        });
+        function selectCustomFontSize(sizePx) { document.getElementById('fontSizeInput').value = sizePx; document.getElementById('fontSizeList').style.display = 'none'; applyCustomFontSize(sizePx); }
+        function stepFontSize(direction) {
+            let current = parseInt(document.getElementById('fontSizeInput').value) || 16;
+            let index = PRESET_FONT_SIZES.indexOf(current);
+            if (index === -1) {
+                let closest = PRESET_FONT_SIZES.reduce((prev, curr) => Math.abs(curr - current) < Math.abs(prev - current) ? curr : prev);
+                index = PRESET_FONT_SIZES.indexOf(closest);
+            }
+            let newIndex = index + direction;
+            if (newIndex < 0) newIndex = 0;
+            if (newIndex >= PRESET_FONT_SIZES.length) newIndex = PRESET_FONT_SIZES.length - 1;
+            let newSize = PRESET_FONT_SIZES[newIndex];
+            document.getElementById('fontSizeInput').value = newSize;
+            applyCustomFontSize(newSize);
+        }
+        function applyCustomFontSize(sizePx) {
+            if (!sizePx) return;
+            if (savedSelection) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedSelection); }
+            document.getElementById('editorContent').focus();
+            document.execCommand("styleWithCSS", false, false);
+            document.execCommand("fontSize", false, "7");
+            const editor = document.getElementById('editorContent');
+            const fonts = editor.querySelectorAll("font[size='7']");
+            fonts.forEach(f => { f.removeAttribute("size"); f.style.fontSize = sizePx + "px"; });
+            const spans = editor.querySelectorAll("span");
+            spans.forEach(s => { if (s.style.fontSize === "xxx-large" || s.style.fontSize === "7" || s.style.fontSize === "48px") { s.style.fontSize = sizePx + "px"; } });
+        }
+
+        function formatDoc(cmd, value=null) { 
+            let activeEl = document.activeElement;
+            if (cmd.startsWith('justify')) {
+                let alignVal = cmd.replace('justify', '').toLowerCase();
+                if (alignVal === 'full') alignVal = 'justify';
+
+                if (activeEl && (activeEl.classList.contains('sig-title') || activeEl.classList.contains('sig-name') || activeEl.classList.contains('transparent-input'))) {
+                    activeEl.style.textAlign = alignVal;
+                    return; 
+                }
+
+                let block = activeEl ? activeEl.closest('.free-move-block') : null;
+                if (block && activeEl === block) {
+                    let wrapper = block.parentElement;
+                    if (wrapper.tagName !== 'DIV' && wrapper.id === 'editorContent') return; 
+                    wrapper.style.textAlign = alignVal;
+                    return; 
+                }
+            }
+            document.getElementById('editorContent').focus(); 
+            document.execCommand(cmd, false, value); 
+        }
+
+        function insertVariable(type) {
+            restoreSelection();
+            let text = "";
+            if (type === 'date') text = document.getElementById('todayDateDisp').value;
+            if (type === 'partyA') { let el = document.getElementById('inputPartyA'); text = (el ? el.value : '') || "[Party A]"; }
+            if (type === 'partyB') { let el = document.getElementById('inputTargetName'); text = (el ? el.value : '') || "[Party B]"; }
+            document.execCommand('insertHTML', false, `<strong>${text}</strong>`);
+        }
+        
+        function insertTable() {
+            restoreSelection();
+            let html = '<br><table border="1" style="width:100%; border-collapse:collapse; text-align:center; min-height:50px;"><tr><td style="padding:8px; border:1px solid #000;">Cell</td><td style="padding:8px; border:1px solid #000;">Cell</td></tr><tr><td style="padding:8px; border:1px solid #000;">Cell</td><td style="padding:8px; border:1px solid #000;">Cell</td></tr></table><br>';
+            document.execCommand('insertHTML', false, html);
+        }
+
+        function insertSignatureBlock(role) {
+            restoreSelection();
+            document.execCommand('insertHTML', false, getSigHTML(role));
+            syncSignaturesToDOM();
+            attachDragAndResizeEvents();
+        }
+
+        function insertTextBox() {
+            restoreSelection();
+            let html = `<div style="text-align: left;">&nbsp;<div class="free-move-block" contenteditable="false" tabindex="0" style="width: 250px; min-height: 50px; top: 0px; left: 0px;">
+                <button class="block-float-btn" onclick="toggleFloatMode(this)" title="Enable Float Mode (Overlay on PDFs)"><i class="fas fa-layer-group"></i></button>
+                <div class="drag-handle" title="Drag to move"><i class="fas fa-arrows-alt"></i></div>
+                <div class="resize-handle" title="Drag to resize"></div>
+                <button class="block-delete-btn" onclick="this.parentElement.parentElement.remove()" title="Delete Block"><i class="fas fa-times"></i></button>
+                <div class="transparent-input" contenteditable="true" style="min-height: 30px; font-size:16px;">Type custom text here...</div>
+            </div>&nbsp;</div><br>`;
+            document.execCommand('insertHTML', false, html);
+            attachDragAndResizeEvents();
+        }
+
+        function insertPhotoFromDisk(event) {
+            if (event.target.files && event.target.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    restoreSelection();
+                    let html = `<div style="text-align: left;">&nbsp;<div class="free-move-block" contenteditable="false" tabindex="0" style="width: 250px; background: transparent; padding: 0; top: 0px; left: 0px;">
+                        <button class="block-float-btn" onclick="toggleFloatMode(this)" title="Enable Float Mode (Overlay)"><i class="fas fa-layer-group"></i></button>
+                        <button class="block-fit-btn" onclick="fitToPage(this)" title="Snap to Full Page"><i class="fas fa-expand"></i></button>
+                        <div class="drag-handle" title="Drag to move"><i class="fas fa-arrows-alt"></i></div>
+                        <div class="resize-handle" title="Drag to resize"></div>
+                        <button class="block-delete-btn" onclick="this.parentElement.parentElement.remove()" title="Delete Image"><i class="fas fa-times"></i></button>
+                        <img src="${e.target.result}" style="width: 100%; height: auto; border: 1px solid #ccc; border-radius: 4px; pointer-events: none;">
+                    </div>&nbsp;</div><br>`;
+                    document.execCommand('insertHTML', false, html);
+                    document.getElementById('photoUploadInput').value = '';
+                    attachDragAndResizeEvents();
+                }
+                reader.readAsDataURL(event.target.files[0]);
+            }
+        }
+
+        function applyTemplate() {
+            const val = document.getElementById('templateSelect').value;
+            if(templates[val] !== undefined) {
+                document.getElementById('editorContent').innerHTML = templates[val];
+                syncSignaturesToDOM(); attachDragAndResizeEvents();
+            }
+        }
+
+        function setTodayDate() {
+            const now = new Date(); const yyyy = now.getFullYear(); const mm = String(now.getMonth() + 1).padStart(2, '0'); const dd = String(now.getDate()).padStart(2, '0');
+            document.getElementById('todayDateDisp').value = `${yyyy}-${mm}-${dd}`;
+        }
+
+        function syncSignaturesToDOM() {
+            document.querySelectorAll('#container-lender').forEach(cLender => {
+                if (document.getElementById('lenderSigData').value.length > 200) {
+                    cLender.innerHTML = `<img src="${document.getElementById('lenderSigData').value}" style="max-height: 55px; max-width: 100%; position:absolute; bottom:2px;">`;
+                } else {
+                    cLender.innerHTML = '<span class="sig-placeholder" style="color:#888; font-size:12px; margin-bottom:2px;">Click to Sign</span>';
+                }
+            });
+            document.querySelectorAll('#container-borrower').forEach(cBorrower => {
+                if (document.getElementById('borrowerSigData').value.length > 200) {
+                    cBorrower.innerHTML = `<img src="${document.getElementById('borrowerSigData').value}" style="max-height: 55px; max-width: 100%; position:absolute; bottom:2px;">`;
+                } else {
+                    cBorrower.innerHTML = '<span class="sig-placeholder" style="color:#888; font-size:12px; margin-bottom:2px;">Click to Sign</span>';
+                }
+            });
+        }
+
+        function setupCanvasEvents() {
+            canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseup', stopDrawing); canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e.touches[0]); }); canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e.touches[0]); }); canvas.addEventListener('touchend', (e) => { e.preventDefault(); stopDrawing(); });
+        }
+        function startDrawing(e) { isDrawing = true; ctx.beginPath(); ctx.moveTo(getX(e), getY(e)); }
+        function draw(e) { if (!isDrawing) return; ctx.lineTo(getX(e), getY(e)); ctx.stroke(); }
+        function stopDrawing() { isDrawing = false; }
+        function getX(e) { const rect = canvas.getBoundingClientRect(); return (e.clientX || e.touches[0].clientX) - rect.left; }
+        function getY(e) { const rect = canvas.getBoundingClientRect(); return (e.clientY || e.touches[0].clientY) - rect.top; }
+        function resizeCanvas() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#000'; }
+
+        function handleModalSigUpload(event) {
+            if (event.target.files && event.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        clearPad();
+                        const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+                        const w = img.width * scale;
+                        const h = img.height * scale;
+                        const x = (canvas.width - w) / 2;
+                        const y = (canvas.height - h) / 2;
+                        ctx.drawImage(img, x, y, w, h);
+                    }
+                    img.src = e.target.result;
+                }
+                reader.readAsDataURL(event.target.files[0]);
+                document.getElementById('modalSigUpload').value = '';
+            }
+        }
+
+        function openPad(role) {
+            currentSigningRole = role; document.getElementById('sigModal').style.display = 'flex'; resizeCanvas(); 
+        }
+        function closePad() { document.getElementById('sigModal').style.display = 'none'; currentSigningRole = null; }
+        function clearPad() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+        function confirmPad() {
+            if (!currentSigningRole) return;
+            const blank = document.createElement('canvas'); blank.width = canvas.width; blank.height = canvas.height;
+            const bCtx = blank.getContext('2d'); bCtx.lineWidth = 2; bCtx.lineCap = 'round'; bCtx.strokeStyle = '#000';
+            if (canvas.toDataURL() === blank.toDataURL()) { alert("⚠️ Signature cannot be empty."); return; }
+            document.getElementById(currentSigningRole + 'SigData').value = canvas.toDataURL('image/png');
+            syncSignaturesToDOM(); closePad();
+        }
+
+        function getCleanHTMLForSave() {
+            let clone = document.getElementById('editorContent').cloneNode(true);
+            clone.querySelectorAll('#container-lender, #container-borrower').forEach(c => {
+                c.innerHTML = '<span class="sig-placeholder" style="color:#888; font-size:12px; margin-bottom:2px;">Click to Sign</span>';
+            });
+            return clone.innerHTML;
+        }
+
+    </script>
+</body>
+</html>
