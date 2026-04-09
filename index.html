@@ -1480,9 +1480,35 @@
             document.execCommand('insertHTML', false, `<strong>${text}</strong>`);
         }
         
-        function insertTable() {
+                function insertTable() {
             restoreSelection();
-            let html = '<br><table border="1" style="width:100%; border-collapse:collapse; text-align:center; min-height:50px;"><tr><td style="padding:8px; border:1px solid #000;">Cell</td><td style="padding:8px; border:1px solid #000;">Cell</td></tr><tr><td style="padding:8px; border:1px solid #000;">Cell</td><td style="padding:8px; border:1px solid #000;">Cell</td></tr></table><br>';
+            
+            // Prompt the user for custom row and column counts
+            let rows = prompt("Enter number of rows:", "3");
+            let cols = prompt("Enter number of columns:", "3");
+            
+            // Validate input: ensure the user entered a valid number and didn't cancel
+            if (!rows || !cols || isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) {
+                return; 
+            }
+            
+            rows = parseInt(rows);
+            cols = parseInt(cols);
+            
+            // Dynamically generate the custom HTML table
+            let html = '<br><table border="1" style="width:100%; border-collapse:collapse; text-align:center; min-height:50px;">';
+            
+            for (let r = 0; r < rows; r++) {
+                html += '<tr>';
+                for (let c = 0; c < cols; c++) {
+                    html += '<td style="padding:8px; border:1px solid #000;">Cell</td>';
+                }
+                html += '</tr>';
+            }
+            
+            html += '</table><br>';
+            
+            // Insert the generated table into the editor
             document.execCommand('insertHTML', false, html);
         }
 
